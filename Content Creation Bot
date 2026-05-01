@@ -1,0 +1,211 @@
+import { useState, useRef, useEffect } from "react";
+
+const CONTENT_TYPES = [
+  { id: "blog", label: "📝 Blog Post" },
+  { id: "social", label: "📱 Social Media" },
+  { id: "email", label: "📧 Email" },
+  { id: "caption", label: "🖼️ Caption" },
+  { id: "ad", label: "📣 Ad Copy" },
+  { id: "script", label: "🎬 Video Script" },
+];
+
+const TONES = ["Professional", "Casual", "Funny", "Persuasive", "Inspiring"];
+
+export default function ContentBot() {
+  const [topic, setTopic] = useState("");
+  const [contentType, setContentType] = useState("blog");
+  const [tone, setTone] = useState("Professional");
+  const [messages, setMessages] = useState([
+    {
+      role: "bot",
+      text: "👋 Hey! I'm your Content Bot. Choose a content type, pick a tone, enter your topic — and I'll generate ready-made content instantly!",
+    },
+  ]);
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const generate = async () => {
+    if (!topic.trim() || loading) return;
+
+    const userMsg = `Generate a ${contentType} about: "${topic}" (Tone: ${tone})`;
+    setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
+    setTopic("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: `You are a professional content writer. Generate ready-to-use content based on the user's topic, content type, and tone. Be concise, creative, and directly usable. Format it cleanly without extra explanations — just deliver the content.`,
+          messages: [{ role: "user", content: userMsg }],
+        }),
+      });
+      const data = await res.json();
+      const text = data.content?.map((b) => b.text || "").join("") || "Sorry, something went wrong.";
+      setMessages((prev) => [...prev, { role: "bot", text }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "bot", text: "⚠️ Error generating content. Please try again." }]);
+    }
+    setLoading(false);
+  };
+
+  const handleKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); generate(); }
+  };
+
+  const copyText = (text) => navigator.clipboard.writeText(text);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0f0c29, #302b63, #24243e)",
+      fontFamily: "'Georgia', serif",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      padding: "24px 16px",
+    }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <h1 style={{
+          fontSize: 32, fontWeight: 700, color: "#fff",
+          letterSpacing: 1, margin: 0,
+          textShadow: "0 0 20px rgba(167,139,250,0.6)"
+        }}>✨ Content Bot</h1>
+        <p style={{ color: "#a78bfa", margin: "6px 0 0", fontSize: 14 }}>
+          Topic in → Ready-made content out
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div style={{
+        display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center",
+        marginBottom: 18, maxWidth: 700, width: "100%"
+      }}>
+        {CONTENT_TYPES.map((ct) => (
+          <button key={ct.id} onClick={() => setContentType(ct.id)} style={{
+            padding: "7px 14px", borderRadius: 20, border: "none", cursor: "pointer",
+            fontSize: 13, fontWeight: 600, transition: "all 0.2s",
+            background: contentType === ct.id ? "#7c3aed" : "rgba(255,255,255,0.08)",
+            color: contentType === ct.id ? "#fff" : "#c4b5fd",
+            boxShadow: contentType === ct.id ? "0 0 12px rgba(124,58,237,0.5)" : "none",
+          }}>{ct.label}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 18 }}>
+        {TONES.map((t) => (
+          <button key={t} onClick={() => setTone(t)} style={{
+            padding: "5px 14px", borderRadius: 20, border: "1.5px solid",
+            borderColor: tone === t ? "#a78bfa" : "rgba(167,139,250,0.25)",
+            cursor: "pointer", fontSize: 12, fontWeight: 500,
+            background: tone === t ? "rgba(167,139,250,0.15)" : "transparent",
+            color: tone === t ? "#a78bfa" : "#9ca3af", transition: "all 0.2s",
+          }}>{t}</button>
+        ))}
+      </div>
+
+      {/* Chat Window */}
+      <div style={{
+        width: "100%", maxWidth: 700, flex: 1,
+        background: "rgba(255,255,255,0.04)",
+        borderRadius: 16, border: "1px solid rgba(167,139,250,0.2)",
+        padding: 16, minHeight: 340, maxHeight: 420, overflowY: "auto",
+        display: "flex", flexDirection: "column", gap: 14,
+        backdropFilter: "blur(10px)",
+      }}>
+        {messages.map((msg, i) => (
+          <div key={i} style={{
+            display: "flex",
+            justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+          }}>
+            <div style={{ maxWidth: "85%", position: "relative" }}>
+              <div style={{
+                padding: "12px 16px",
+                borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                background: msg.role === "user"
+                  ? "linear-gradient(135deg, #7c3aed, #4f46e5)"
+                  : "rgba(255,255,255,0.08)",
+                color: "#f3f4f6", fontSize: 14, lineHeight: 1.65,
+                whiteSpace: "pre-wrap", wordBreak: "break-word",
+                boxShadow: msg.role === "user" ? "0 4px 15px rgba(124,58,237,0.3)" : "none",
+                border: msg.role === "bot" ? "1px solid rgba(167,139,250,0.15)" : "none",
+              }}>
+                {msg.text}
+              </div>
+              {msg.role === "bot" && i > 0 && (
+                <button onClick={() => copyText(msg.text)} style={{
+                  marginTop: 4, background: "none", border: "none",
+                  color: "#6d28d9", cursor: "pointer", fontSize: 11,
+                  padding: "2px 0", display: "block",
+                }}>📋 Copy</button>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div style={{ display: "flex", gap: 5, alignItems: "center", padding: "4px 8px" }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{
+                width: 8, height: 8, borderRadius: "50%", background: "#7c3aed",
+                animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+              }} />
+            ))}
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{
+        display: "flex", gap: 10, marginTop: 14, width: "100%", maxWidth: 700,
+      }}>
+        <textarea
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder={`Enter your topic for a ${contentType} in ${tone} tone...`}
+          rows={2}
+          style={{
+            flex: 1, padding: "12px 16px", borderRadius: 12,
+            background: "rgba(255,255,255,0.07)",
+            border: "1.5px solid rgba(167,139,250,0.3)",
+            color: "#f3f4f6", fontSize: 14, resize: "none",
+            outline: "none", fontFamily: "inherit",
+            transition: "border-color 0.2s",
+          }}
+          onFocus={(e) => e.target.style.borderColor = "#7c3aed"}
+          onBlur={(e) => e.target.style.borderColor = "rgba(167,139,250,0.3)"}
+        />
+        <button onClick={generate} disabled={!topic.trim() || loading} style={{
+          padding: "0 22px", borderRadius: 12, border: "none",
+          background: topic.trim() && !loading
+            ? "linear-gradient(135deg, #7c3aed, #4f46e5)"
+            : "rgba(255,255,255,0.1)",
+          color: topic.trim() && !loading ? "#fff" : "#6b7280",
+          cursor: topic.trim() && !loading ? "pointer" : "not-allowed",
+          fontWeight: 700, fontSize: 20, transition: "all 0.2s",
+          boxShadow: topic.trim() && !loading ? "0 4px 15px rgba(124,58,237,0.4)" : "none",
+        }}>→</button>
+      </div>
+
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+          40% { transform: scale(1); opacity: 1; }
+        }
+        textarea::placeholder { color: #6b7280; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.4); border-radius: 10px; }
+      `}</style>
+    </div>
+  );
+}
